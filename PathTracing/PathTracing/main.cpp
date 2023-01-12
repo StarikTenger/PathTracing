@@ -7,12 +7,13 @@
 
 using namespace std;
 
-GLuint ps, vs, prog, r_mod;
+GLuint ps, vs, prog, r_mod, timeq;
 float angle = 0;
 void render(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUniform1f(r_mod, angle);
+	glUniform1f(timeq, angle);
 
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex3f(-1, -1, 0);
@@ -52,6 +53,7 @@ void set_shader() {
 	glLinkProgram(prog);
 	glUseProgram(prog);
 	r_mod = glGetUniformLocation(prog, "r_mod");
+	timeq = glGetUniformLocation(prog, "time");
 }
 
 int main(int argc, char** argv)

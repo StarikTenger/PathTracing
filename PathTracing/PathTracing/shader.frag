@@ -1,32 +1,102 @@
-#version 150
+#version 330 core
 varying float x, y, z;
 uniform float r_mod;
 const float EPS = 1e-5;
 const float PI = 3.14159265359;
+const int DEPTH = 3;
+uniform float time;
 
-struct Sphere {
-	vec3 pos;
-	float r;
+// -- RANDOM -------------------------------------------------------------------
+
+float random_magic_parameter = 0;
+
+// A single iteration of Bob Jenkins' One-At-A-Time hashing algorithm.
+uint hash( uint x ) {
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+// Compound versions of the hashing algorithm I whipped together.
+uint hash( uvec2 v ) { return hash( v.x ^ hash(v.y)                         ); }
+uint hash( uvec3 v ) { return hash( v.x ^ hash(v.y) ^ hash(v.z)             ); }
+uint hash( uvec4 v ) { return hash( v.x ^ hash(v.y) ^ hash(v.z) ^ hash(v.w) ); }
+
+// Construct a float with half-open range [0:1] using low 23 bits.
+// All zeroes yields 0.0, all ones yields the next smallest representable value below 1.0.
+float floatConstruct( uint m ) {
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+}
+
+// Pseudo-random value in half-open range [0:1].
+float random( float x ) { return floatConstruct(hash(floatBitsToUint(x))); }
+float random( vec2  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+
+float rand(float l, float r) {
+	random_magic_parameter += 0.1231;
+	return l + random(vec4(x, y, time, random_magic_parameter)) * (r - l);
+}
+
+vec2 gaussian() {
+	float x, y;
+	float s = 2;
+	int i = 0;
+	while(s > 1 && i < 5) {
+		x = rand(-1, 1);
+		y = rand(-1, 1);
+		s = x * x + y * y;
+		i++;
+	}
+	return vec2(x * sqrt(-2 * log(s) / s), y * sqrt(-2 * log(s) / s));
+}
+
+// -- OBJECT STRUCTURES --------------------------------------------------------
+
+struct Material {
 	vec3 col;
 	float glow;
 	float ref;
 };
 
+struct Sphere {
+	vec3 pos;
+	float r;
+	Material mat;
+};
+
 struct Plane {
 	vec3 origin;
 	vec3 norm;
+	Material mat;
 };
 
 struct Triangle {
 	vec3 vertices[3];
+	Material mat;
 };
 
+// -- ARRAYS -------------------------------------------------------------------
+
 Sphere spheres[10];
-int spheres_number = 1;
+int spheres_number = 2;
 Plane planes[10];
-int planes_number = 0;
+int planes_number = 5;
 Triangle triangles[10];
-int triangles_number = 1;
+int triangles_number = 0;
+
+// -- RAYTRACING STRUCTURES ----------------------------------------------------
 
 struct Cam {
 	vec3 pos;
@@ -40,7 +110,7 @@ vec3 calc_ray_dir(Cam cam, vec2 screen_coords) {
 	return normalize(
 		screen_coords.x * right + 
 		screen_coords.y * cam.up + 
-		normalize(cam.focus) * normalize(cam.dir));
+		cam.focus * normalize(cam.dir));
 }
 
 struct Ray {
@@ -52,7 +122,10 @@ struct Collision {
 	bool exists;
 	vec3 pos;
 	vec3 norm;
+	Material mat;
 };
+
+// -- INTERSECTION METHODS -----------------------------------------------------
 
 // calculates intersection with sphere
 Collision intersect_sphere(Ray ray, Sphere sphere) {
@@ -80,6 +153,7 @@ Collision intersect_sphere(Ray ray, Sphere sphere) {
 	vec3 intersection = t * ray.dir + pos_rel;
 	coll.pos = intersection + sphere.pos;
 	coll.norm = normalize(intersection);
+	coll.mat = sphere.mat;
 	return coll;
 }
 
@@ -99,10 +173,11 @@ Collision intersect_plane(Ray ray, Plane plane) {
 		coll.exists = true;
 	}
 	coll.norm = plane.norm;
-	if (dot(ray.dir, coll.norm) < 0.0) {
+	if (dot(ray.dir, coll.norm) > 0.0) {
 		coll.norm *= -1;
 	}
 
+	coll.mat = plane.mat;
 	return coll;
 }
 
@@ -135,7 +210,8 @@ Collision intersect_triangle(Ray ray, Triangle triangle) {
 		coll = intersect_plane(ray, Plane(triangle.vertices[0], 
 			cross(
 				triangle.vertices[1] - triangle.vertices[0], 
-				triangle.vertices[2] - triangle.vertices[0])));
+				triangle.vertices[2] - triangle.vertices[0]),
+			triangle.mat));
 	}
 
 	return coll;
@@ -171,7 +247,7 @@ Collision intersection(Ray ray) {
 	for (int i = 0; i < triangles_number; i++) {
 		Collision coll_cur = intersect_triangle(ray, triangles[i]);
 		float dis_cur = distance(ray.origin, coll_cur.pos);
-		if (coll_cur.exists &&dis_cur < dist_min) {
+		if (coll_cur.exists && dis_cur < dist_min) {
 			dist_min = dis_cur;
 			coll = coll_cur;
 		}
@@ -180,24 +256,60 @@ Collision intersection(Ray ray) {
 	return coll;
 }
 
+// -- PATH TRACING -------------------------------------------------------------
+vec3 trace_path(Ray ray) {
+	vec3 color = vec3(1,1,1) * 0.;
+	for (int i = 0; i < 3; i++) {
+		Collision coll = intersection(ray);
+		if (coll.exists) {
+			color += coll.mat.col * (coll.mat.glow + vec3(1,1,1) * 0.1);
+		} else {
+			break;
+		}
+		vec3 n = normalize(coll.norm * dot(coll.norm, ray.dir));
+		ray.origin = coll.pos + coll.norm * EPS;
+		if (rand(0, 1) >= coll.mat.ref) {
+			vec3 new_dir = normalize(vec3(gaussian(), gaussian().x));
+			if (dot(coll.norm, new_dir) < 0) {
+				new_dir *= -1;
+			}
+			ray.dir = new_dir;
+		} else {
+			ray.dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
+		}
+	}
+	
+	return color;
+}
+
+// -- MAIN FUNCTION ------------------------------------------------------------
+
 void main() {
-	Cam cam = {{0.0, 0.0, -1.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}, 100.};
-	spheres[0] = Sphere(vec3(0.0, 0.0, 0.0), 0.5, vec3(1.0, 1.0, 1.0), 0.0, 0.0);
-	spheres[1] = Sphere(vec3(0.2, 0.3, -0.2), 0.2, vec3(1.0, 1.0, 1.0), 0.0, 0.0);
-	spheres[2] = Sphere(vec3(-0.2, 0.3, -0.2), 0.2, vec3(1.0, 1.0, 1.0), 0.0, 0.0);
-	planes[0] = Plane(vec3(0.0, -.2, 0.0), vec3(0.0, 1.0, 0.0));
-	float p = sin(r_mod * 0.2);
-	triangles[0] = Triangle(vec3[3](
-		vec3(0.0, 0.0, p),
-		vec3(0.0, 1.0, p), 
-		vec3(1.0, 1.0, p)));
+	Cam cam = {{0.0, 0.0, -1.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}, 1.};
+
+	float t = sin(-r_mod * 3.) + 0.3;
+
+	Material m1 = {{1.0, 1.0, 1.0}, 1.0, 0.0};
+	Material m2 = {{0.0, 0.0, 1.0}, 1.0, 0.0};
+	Material m3 = {{0.0, 1.0, 1.0}, 0.0, 0.0};
+	Material m4 = {{1.0, 0.0, 0.0}, 0.0, 0.5};
+
+	spheres_number = 4;
+	spheres[0] = Sphere(vec3(-1.0, 1.0, 1.0), 0.4, m1);
+	spheres[1] = Sphere(vec3(0.3, -1 + t, 1.), 0.4, m2);
+	spheres[2] = Sphere(vec3(-.3, -1.0, 0.3), 0.4, m4);
+	//spheres[4] = Sphere(vec3(0., -1.0, 0.0), 0.2, m4);
+	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), m3);
+	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), m4);
+	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), m4);
+	planes[3] = Plane(vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), m3);
+	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), m3);
 
 	vec3 ray_dir = calc_ray_dir(cam, vec2(x, y));
-	
-	gl_FragColor = vec4(1.0, 1., 1., 1.0) * 0.0;
-	
-	Collision coll = intersection(Ray(cam.pos, ray_dir));
-	if (coll.exists) {
-		gl_FragColor = vec4(abs(coll.norm), 1.0) ;
+	int steps = 100;
+	vec3 col = {0,0,0};
+	for (int i = 0; i < steps; i++) {
+		col += trace_path(Ray(cam.pos, ray_dir)) / steps;
 	}
+	gl_FragColor = vec4(col, 1);
 }
