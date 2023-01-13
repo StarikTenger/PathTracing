@@ -106,7 +106,7 @@ struct Cam {
 };
 
 vec3 calc_ray_dir(Cam cam, vec2 screen_coords) {
-	vec3 right = normalize(cross(cam.dir, cam.up));
+	vec3 right = -normalize(cross(cam.dir, cam.up));
 	return normalize(
 		screen_coords.x * right + 
 		screen_coords.y * cam.up + 
@@ -259,10 +259,12 @@ Collision intersection(Ray ray) {
 // -- PATH TRACING -------------------------------------------------------------
 vec3 trace_path(Ray ray) {
 	vec3 color = vec3(1,1,1) * 0.;
-	for (int i = 0; i < 3; i++) {
+	vec3 color_modifier = vec3(1,1,1);
+	for (int i = 0; i < 5; i++) {
 		Collision coll = intersection(ray);
 		if (coll.exists) {
-			color += coll.mat.col * (coll.mat.glow + vec3(1,1,1) * 0.1);
+			color += coll.mat.col * (coll.mat.glow);
+			color_modifier *= coll.mat.col;// - vec3(1,1,1);
 		} else {
 			break;
 		}
@@ -279,7 +281,7 @@ vec3 trace_path(Ray ray) {
 		}
 	}
 	
-	return color;
+	return color * color_modifier;
 }
 
 // -- MAIN FUNCTION ------------------------------------------------------------
@@ -287,26 +289,28 @@ vec3 trace_path(Ray ray) {
 void main() {
 	Cam cam = {{0.0, 0.0, -1.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}, 1.};
 
-	float t = sin(-r_mod * 3.) + 0.3;
-
-	Material m1 = {{1.0, 1.0, 1.0}, 1.0, 0.0};
-	Material m2 = {{0.0, 0.0, 1.0}, 1.0, 0.0};
-	Material m3 = {{0.0, 1.0, 1.0}, 0.0, 0.0};
-	Material m4 = {{1.0, 0.0, 0.0}, 0.0, 0.5};
+	Material white_light = {{1.0, 1.0, 1.0}, 1.0, 0.0};
+	Material red_light = {{1.0, 0.4, 0.4}, 1.0, 0.0};
+	Material blue_light = {{0.4, 0.4, 1.0}, 1.0, 0.0};
+	Material mirror = {{0.0, 1.0, 0.0}, 0.0, 1.0};
+	Material white_panel = {{1.0, 1.0, 1.0}, 0.0, 0.0};
 
 	spheres_number = 4;
-	spheres[0] = Sphere(vec3(-1.0, 1.0, 1.0), 0.4, m1);
-	spheres[1] = Sphere(vec3(0.3, -1 + t, 1.), 0.4, m2);
-	spheres[2] = Sphere(vec3(-.3, -1.0, 0.3), 0.4, m4);
+	spheres[0] = Sphere(vec3(-1.0, 1.0, 1.0), 0.5, red_light);
+	spheres[1] = Sphere(vec3(1.0, 1.0, 1.0), 0.5, blue_light);
+	spheres[3] = Sphere(vec3(0.3, 0.3, 1.), 0.2, mirror);
+	spheres[2] = Sphere(vec3(-.3, -1.0, 0.3), 0.4, mirror);
 	//spheres[4] = Sphere(vec3(0., -1.0, 0.0), 0.2, m4);
-	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), m3);
-	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), m4);
-	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), m4);
-	planes[3] = Plane(vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), m3);
-	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), m3);
+	planes_number = 6;
+	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), white_panel);
+	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), white_panel);
+	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), white_panel);
+	planes[3] = Plane(vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), white_panel);
+	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), white_panel);
+	planes[5] = Plane(vec3(0.0, 0.0, -3.0), vec3(0.0, 0.0, 1.0), white_light);
 
 	vec3 ray_dir = calc_ray_dir(cam, vec2(x, y));
-	int steps = 100;
+	int steps = 10;
 	vec3 col = {0,0,0};
 	for (int i = 0; i < steps; i++) {
 		col += trace_path(Ray(cam.pos, ray_dir)) / steps;

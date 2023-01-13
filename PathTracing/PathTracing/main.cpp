@@ -4,13 +4,32 @@
 #include <GL/glut.h>
 #include <fstream>
 #include <sstream>
+#include <iostream>
+#include "BMPWriter.h"
 
 using namespace std;
 
-GLuint ps, vs, prog, r_mod, timeq;
+GLuint ps, vs, prog, r_mod, timeq, window;
 float angle = 0;
-void render(void)
-{
+unsigned char buff[600 * 600 * 3];
+unsigned long long bigbuff[600 * 600 * 3];
+int samples = 0;
+
+void add_sample() {
+	samples++;
+	for (int i = 0; i < 600 * 600 * 3; i++) {
+		bigbuff[i] += buff[i];
+	}
+}
+
+void sum_samples() {
+	for (int i = 0; i < 600 * 600 * 3; i++) {
+		buff[i] = bigbuff[i] / samples;
+	}
+	generateBitmapImage(buff, 600, 600, (char*)"image.bmp");
+}
+
+void render(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUniform1f(r_mod, angle);
 	glUniform1f(timeq, angle);
@@ -21,8 +40,15 @@ void render(void)
 	glVertex3f(1, 1, 0);
 	glVertex3f(1, -1, 0);
 	glEnd();
-	angle += .002;
-	glutSwapBuffers();
+	glFlush();
+	angle +=0.001;
+	glReadPixels(0, 0, 600, 600, GL_BGR, GL_UNSIGNED_BYTE, buff);
+	add_sample();
+	cout << samples << "\n";
+	if (samples >= 1000) {
+		sum_samples();
+		glutDestroyWindow(window);
+	}
 }
 
 void set_shader() {
@@ -59,9 +85,9 @@ void set_shader() {
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
+	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowSize(600, 600);
-	glutCreateWindow("Zhopa");
+	window = glutCreateWindow("Zhopa");
 	glutIdleFunc(render);
 
 	glewInit();
