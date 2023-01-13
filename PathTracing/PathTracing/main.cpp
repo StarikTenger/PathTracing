@@ -9,24 +9,28 @@
 
 using namespace std;
 
+const unsigned int image_szie = 1000;
+const unsigned int steps = 1000;
+
+
 GLuint ps, vs, prog, r_mod, timeq, window;
 float angle = 0;
-unsigned char buff[600 * 600 * 3];
-unsigned long long bigbuff[600 * 600 * 3];
+unsigned char buff[image_szie * image_szie * 3];
+unsigned long long bigbuff[image_szie * image_szie * 3];
 int samples = 0;
 
 void add_sample() {
 	samples++;
-	for (int i = 0; i < 600 * 600 * 3; i++) {
+	for (int i = 0; i < image_szie * image_szie * 3; i++) {
 		bigbuff[i] += buff[i];
 	}
 }
 
 void sum_samples() {
-	for (int i = 0; i < 600 * 600 * 3; i++) {
+	for (int i = 0; i < image_szie * image_szie * 3; i++) {
 		buff[i] = bigbuff[i] / samples;
 	}
-	generateBitmapImage(buff, 600, 600, (char*)"image.bmp");
+	generateBitmapImage(buff, image_szie, image_szie, (char*)"image.bmp");
 }
 
 void render(void) {
@@ -42,10 +46,10 @@ void render(void) {
 	glEnd();
 	glFlush();
 	angle +=0.001;
-	glReadPixels(0, 0, 600, 600, GL_BGR, GL_UNSIGNED_BYTE, buff);
+	glReadPixels(0, 0, image_szie, image_szie, GL_BGR, GL_UNSIGNED_BYTE, buff);
 	add_sample();
 	cout << samples << "\n";
-	if (samples >= 1000) {
+	if (samples >= steps) {
 		sum_samples();
 		glutDestroyWindow(window);
 	}
@@ -86,7 +90,7 @@ int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-	glutInitWindowSize(600, 600);
+	glutInitWindowSize(image_szie, image_szie);
 	window = glutCreateWindow("Zhopa");
 	glutIdleFunc(render);
 
