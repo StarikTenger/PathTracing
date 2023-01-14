@@ -5,6 +5,8 @@ const float EPS = 1e-5;
 const float PI = 3.14159265359;
 const int DEPTH = 10;
 uniform float time;
+uniform float size_x;
+uniform float size_y;
 
 // -- RANDOM -------------------------------------------------------------------
 
@@ -110,8 +112,8 @@ struct Cam {
 
 vec3 calc_ray_dir(Cam cam, vec2 screen_coords) {
 	vec3 right = -normalize(cross(cam.dir, cam.up));
-	screen_coords.x += rand(0, 1) / 1000;
-	screen_coords.y += rand(0, 1) / 1000;
+	screen_coords.x += rand(0, 1) / size_x;
+	screen_coords.y += rand(0, 1) / size_y;
 	return normalize(
 		screen_coords.x * right + 
 		screen_coords.y * cam.up + 
@@ -296,19 +298,20 @@ vec3 trace_path(Ray ray) {
 			ray.dir = new_dir;
 		} else 
 		if (rand(0, 1) < coll.mat.refr) {
+			//i--;
 			vec3 new_dir = ray.dir;
 			if (dot(coll.norm, ray.dir) < 0) {
 				ray.origin = coll.pos - coll.norm * EPS;
-				new_dir = refract(ray.dir, coll.norm, coll.mat.refr_k);
+				new_dir = refract(ray.dir, coll.norm, 1/coll.mat.refr_k);
 			}
 			else {
-				//ray.origin = coll.pos + coll.norm * EPS;
-				//new_dir = refract(ray.dir, -coll.norm, 1/coll.mat.refr_k);
+				ray.origin = coll.pos + coll.norm * EPS;
+				new_dir = refract(ray.dir, -coll.norm, coll.mat.refr_k);
 			}
 			if (distance(vec3(0,0,0), new_dir) < 0.5) {
-				ray.origin = coll.pos + coll.norm * EPS;
+				//ray.origin = coll.pos - coll.norm * EPS;
 				//new_dir = ray.dir;
-				new_dir = reflect(ray.dir, coll.norm);
+				//new_dir = reflect(ray.dir, coll.norm);
 				//new_dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
 				//new_dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
 				//new_dir = normalize(new_dir);
@@ -327,11 +330,12 @@ vec3 trace_path(Ray ray) {
 // -- MAIN FUNCTION ------------------------------------------------------------
 
 void main() {
-	Cam cam = {{0.0, 0.0, -2.0}, {0.0, 0.0, 1.0}, {0.0, 1.0, 0.0}, 1.};
+	vec3 cam_pos = {-0.6, 0.8, -1.4};
+	Cam cam = {cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), {0.0, 1.0, 0.0}, 1.};
 
 	Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
 	Material red_light = {{1.0, 0.7, 0.7}, 0.0, 1.0, 0.03, 0.0, 0.0};
-	Material blue_light = {{1.0, 1.0, 1.0}, 0.0, 1.0, 0.0, 1., 1/1.2};
+	Material blue_light = {{1., 1., 1.0}, 0.0, 1.0, 0.06, .95, 1.13};
 	Material mirror = {{1, 1, 1}, .0, 1.0, 0.0, 0.0, 0.0};
 	Material mirror_1 = {{0.5, 0.0, 1.0}, 0.0, 0.3, 0.0, 0.0, 0.0};
 	Material mirror_2 = {{0.5, 1.0, 0.6}, 0.0, 1.0, 0.0, 0.0, 0.0};
@@ -339,12 +343,28 @@ void main() {
 	Material black_panel = {{0.0, 0.0, 0.0}, 0.0, 0.0, 0.0, 0.0, 0.0};
 	Material yellow_panel = {{0.7, 1.0, 0.4}, 0.0, 0.0, 0.0, 0.0, 0.0};
 
-	spheres_number = 5;
-	spheres[0] = Sphere(vec3(-1.0, 1., 1.5) * 0.3, 0.7, red_light);
-	spheres[1] = Sphere(vec3(0.3, -0.2, -.5), 0.5, blue_light);
-	spheres[3] = Sphere(vec3(0.3, 0.3, 1.), 0.2, mirror_1);
-	spheres[2] = Sphere(vec3(-.5, -1.0, 0.4), 0.4, mirror_2);
-	spheres[4] = Sphere(vec3(0., .9, 0.0), 0.2, white_light);
+	triangles_number = 2;
+	float lamp_size = 0.2;
+	float lamp_h = 0.01;
+	triangles[0] = Triangle(
+			vec3[3](
+				vec3(-lamp_size, 1 - lamp_h,-lamp_size),
+				vec3(lamp_size, 1 - lamp_h,-lamp_size),
+				vec3(-lamp_size, 1 - lamp_h,lamp_size)),
+			white_light);
+	triangles[1] = Triangle(
+			vec3[3](
+				vec3(lamp_size, 1 - lamp_h, lamp_size),
+				vec3(-lamp_size, 1 - lamp_h,lamp_size),
+				vec3(lamp_size, 1 - lamp_h,-lamp_size)),
+			white_light);
+
+	spheres_number = 1;
+//	spheres[0] = Sphere(vec3(-1.0, 1., 1.5) * 0.3, 0.7, red_light);
+	spheres[0] = Sphere(vec3(0.0, -0.0, -.0), 0.5, blue_light);
+//	spheres[3] = Sphere(vec3(0.3, 0.3, 1.), 0.2, mirror_1);
+//	spheres[2] = Sphere(vec3(-.5, -1.0, 0.4), 0.4, mirror_2);
+//	spheres[1] = Sphere(vec3(0., .9, 0.0), 0.2, white_light);
 	planes_number = 6;
 	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), white_panel);
 	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), white_panel);

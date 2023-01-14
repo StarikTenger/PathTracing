@@ -9,11 +9,11 @@
 
 using namespace std;
 
-const unsigned int image_szie = 1000;
+const int image_szie = 800;
 const unsigned int steps = 1000;
 
 
-GLuint ps, vs, prog, r_mod, timeq, window;
+GLuint ps, vs, prog, r_mod, timeq, window, uniform_size_x, uniform_size_y;
 float angle = 0;
 unsigned char buff[image_szie * image_szie * 3];
 unsigned long long bigbuff[image_szie * image_szie * 3];
@@ -37,6 +37,8 @@ void render(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUniform1f(r_mod, angle);
 	glUniform1f(timeq, angle);
+	glUniform1f(uniform_size_x, (float)image_szie);
+	glUniform1f(uniform_size_y, (float)image_szie);
 
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex3f(-1, -1, 0);
@@ -49,7 +51,7 @@ void render(void) {
 	glReadPixels(0, 0, image_szie, image_szie, GL_BGR, GL_UNSIGNED_BYTE, buff);
 	add_sample();
 	cout << samples << "\n";
-	if (samples >= steps) {
+	if (samples >= steps) {	
 		sum_samples();
 		glutDestroyWindow(window);
 	}
@@ -84,6 +86,8 @@ void set_shader() {
 	glUseProgram(prog);
 	r_mod = glGetUniformLocation(prog, "r_mod");
 	timeq = glGetUniformLocation(prog, "time");
+	uniform_size_x = glGetUniformLocation(prog, "size_x");
+	uniform_size_y = glGetUniformLocation(prog, "size_y");
 }
 
 int main(int argc, char** argv)
