@@ -9,36 +9,36 @@
 
 using namespace std;
 
-const int image_szie = 800;
+const int image_size = 800;
 const unsigned int steps = 1000;
 
 
 GLuint ps, vs, prog, r_mod, timeq, window, uniform_size_x, uniform_size_y;
 float angle = 0;
-unsigned char buff[image_szie * image_szie * 3];
-unsigned long long bigbuff[image_szie * image_szie * 3];
+unsigned char buff[image_size * image_size * 3];
+unsigned long long bigbuff[image_size * image_size * 3];
 int samples = 0;
 
 void add_sample() {
 	samples++;
-	for (int i = 0; i < image_szie * image_szie * 3; i++) {
+	for (int i = 0; i < image_size * image_size * 3; i++) {
 		bigbuff[i] += buff[i];
 	}
 }
 
 void sum_samples() {
-	for (int i = 0; i < image_szie * image_szie * 3; i++) {
+	for (int i = 0; i < image_size * image_size * 3; i++) {
 		buff[i] = bigbuff[i] / samples;
 	}
-	generateBitmapImage(buff, image_szie, image_szie, (char*)"image.bmp");
+	generateBitmapImage(buff, image_size, image_size, (char*)"image.bmp");
 }
 
 void render(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glUniform1f(r_mod, angle);
 	glUniform1f(timeq, angle);
-	glUniform1f(uniform_size_x, (float)image_szie);
-	glUniform1f(uniform_size_y, (float)image_szie);
+	glUniform1f(uniform_size_x, (float)image_size);
+	glUniform1f(uniform_size_y, (float)image_size);
 
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex3f(-1, -1, 0);
@@ -48,7 +48,7 @@ void render(void) {
 	glEnd();
 	glFlush();
 	angle +=0.001;
-	glReadPixels(0, 0, image_szie, image_szie, GL_BGR, GL_UNSIGNED_BYTE, buff);
+	glReadPixels(0, 0, image_size, image_size, GL_BGR, GL_UNSIGNED_BYTE, buff);
 	add_sample();
 	cout << samples << "\n";
 	if (samples >= steps) {	
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
-	glutInitWindowSize(image_szie, image_szie);
+	glutInitWindowSize(image_size, image_size);
 	window = glutCreateWindow("Zhopa");
 	glutIdleFunc(render);
 
