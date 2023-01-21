@@ -269,15 +269,6 @@ Collision intersection(Ray ray) {
 	return coll;
 }
 
-vec3 ray_refract(vec3 I, vec3 N, float eta) {
-    float k = 1.0 - eta * eta * (1.0 - dot(N, I) * dot(N, I));
-    //k *= -1.;
-    if (k >= 0.0) {
-        return eta * I - (eta * dot(N, I) + sqrt(k)) * N;
-	}
-	return vec3(0,0,0);
-}
-
 // -- PATH TRACING -------------------------------------------------------------
 vec3 trace_path(Ray ray) {
 	vec3 color = vec3(1,1,1) * 0.;
