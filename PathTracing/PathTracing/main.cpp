@@ -4,16 +4,36 @@
 #include <GL/glut.h>
 #include <fstream>
 #include <sstream>
+#include <vector>
+#include <string>
 #include <iostream>
 #include "BMPWriter.h"
+#include "glm.hpp"
 
 using namespace std;
+using namespace glm;
 
-const int image_size = 800;
+struct Material {
+	vec3 col;
+	float glow;
+	float ref;
+	float diff;
+	float refr;
+	float refr_k;
+};
+
+struct Sphere {
+	vec3 pos;
+	float r;
+	Material mat;
+};
+
+const int image_size = 500;
 const unsigned int steps = 1000;
 
 
-GLuint ps, vs, prog, r_mod, timeq, window, uniform_size_x, uniform_size_y;
+GLuint ps, vs, prog, r_mod, timeq, window, uniform_size_x, uniform_size_y, 
+	uniform_spheres;
 float angle = 0;
 unsigned char buff[image_size * image_size * 3];
 unsigned long long bigbuff[image_size * image_size * 3];
@@ -33,12 +53,12 @@ void sum_samples() {
 	generateBitmapImage(buff, image_size, image_size, (char*)"image.bmp");
 }
 
+vector<Sphere> spheres;
+
 void render(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
-	glUniform1f(r_mod, angle);
+
 	glUniform1f(timeq, angle);
-	glUniform1f(uniform_size_x, (float)image_size);
-	glUniform1f(uniform_size_y, (float)image_size);
 
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex3f(-1, -1, 0);
@@ -47,7 +67,7 @@ void render(void) {
 	glVertex3f(1, -1, 0);
 	glEnd();
 	glFlush();
-	angle +=0.001;
+	angle += 0.001;
 	glReadPixels(0, 0, image_size, image_size, GL_BGR, GL_UNSIGNED_BYTE, buff);
 	add_sample();
 	cout << samples << "\n";
@@ -88,10 +108,39 @@ void set_shader() {
 	timeq = glGetUniformLocation(prog, "time");
 	uniform_size_x = glGetUniformLocation(prog, "size_x");
 	uniform_size_y = glGetUniformLocation(prog, "size_y");
+
+	glUniform1f(r_mod, angle);
+	
+	glUniform1f(uniform_size_x, (float)image_size);
+	glUniform1f(uniform_size_y, (float)image_size);
+	for (int i = 0; i < spheres.size(); i++) {
+		string sph = "spheres[" + to_string(i) + "]";
+		glUniform3f(glGetUniformLocation(prog, (sph + ".pos").c_str()),
+			spheres[i].pos.x, spheres[i].pos.y, spheres[i].pos.z);
+		glUniform1f(glGetUniformLocation(prog, (sph + ".r").c_str()),
+			spheres[i].r);
+		glUniform3f(glGetUniformLocation(prog, (sph + ".mat.col").c_str()),
+			spheres[i].mat.col.x, spheres[i].mat.col.y, spheres[i].mat.col.z);
+		glUniform1f(glGetUniformLocation(prog, (sph + ".mat.glow").c_str()),
+			spheres[i].mat.glow);
+		glUniform1f(glGetUniformLocation(prog, (sph + ".mat.ref").c_str()),
+			spheres[i].mat.ref);
+		glUniform1f(glGetUniformLocation(prog, (sph + ".mat.diff").c_str()),
+			spheres[i].mat.diff);
+		glUniform1f(glGetUniformLocation(prog, (sph + ".mat.refr").c_str()),
+			spheres[i].mat.refr);
+		glUniform1f(glGetUniformLocation(prog, (sph + ".mat.refr_k").c_str()),
+			spheres[i].mat.refr_k);
+	}
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
+	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.03, 0.0, 0.0 };
+	for (int i = 0; i < 20; i++) {
+		spheres.push_back({ vec3(sin(i * 0.5) * 0.3, -0.9 + i * 0.09, cos(i * 0.5) * 0.3), 0.1, red_light });
+	}
+	
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowSize(image_size, image_size);

@@ -94,8 +94,8 @@ struct Triangle {
 
 // -- ARRAYS -------------------------------------------------------------------
 
-Sphere spheres[10];
-int spheres_number = 2;
+uniform Sphere spheres[20];
+int spheres_number = 1;
 Plane planes[10];
 int planes_number = 5;
 Triangle triangles[10];
@@ -330,7 +330,7 @@ vec3 trace_path(Ray ray) {
 // -- MAIN FUNCTION ------------------------------------------------------------
 
 void main() {
-	vec3 cam_pos = {-0.6, 0.8, -1.4};
+	vec3 cam_pos = {-0.0, 0.0, -1.4};
 	Cam cam = {cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), {0.0, 1.0, 0.0}, 1.};
 
 	Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
@@ -359,9 +359,9 @@ void main() {
 				vec3(lamp_size, 1 - lamp_h,-lamp_size)),
 			white_light);
 
-	spheres_number = 1;
+	spheres_number = 20;
 //	spheres[0] = Sphere(vec3(-1.0, 1., 1.5) * 0.3, 0.7, red_light);
-	spheres[0] = Sphere(vec3(0.0, -0.0, -.0), 0.5, blue_light);
+//	spheres[0] = Sphere(vec3(0.0, -0.0, -.0), 0.5, blue_light);
 //	spheres[3] = Sphere(vec3(0.3, 0.3, 1.), 0.2, mirror_1);
 //	spheres[2] = Sphere(vec3(-.5, -1.0, 0.4), 0.4, mirror_2);
 //	spheres[1] = Sphere(vec3(0., .9, 0.0), 0.2, white_light);
