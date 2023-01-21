@@ -113,6 +113,7 @@ void set_shader() {
 	
 	glUniform1f(uniform_size_x, (float)image_size);
 	glUniform1f(uniform_size_y, (float)image_size);
+	glUniform1i(glGetUniformLocation(prog, "spheres_number"), (int32_t)spheres.size());
 	for (int i = 0; i < spheres.size(); i++) {
 		string sph = "spheres[" + to_string(i) + "]";
 		glUniform3f(glGetUniformLocation(prog, (sph + ".pos").c_str()),
@@ -137,7 +138,7 @@ void set_shader() {
 int main(int argc, char** argv) {
 	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.03, 0.0, 0.0 };
 	for (int i = 0; i < 20; i++) {
-		spheres.push_back({ vec3(sin(i * 0.5) * 0.3, -0.9 + i * 0.09, cos(i * 0.5) * 0.3), 0.1, red_light });
+		spheres.push_back({ vec3(sin(i * 0.5) * 0.3, -0.9 + i * 0.09, cos(i * 0.5) * 0.3), 0.17, red_light });
 	}
 	
 

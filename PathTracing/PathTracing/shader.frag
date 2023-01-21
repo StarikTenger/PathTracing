@@ -95,7 +95,7 @@ struct Triangle {
 // -- ARRAYS -------------------------------------------------------------------
 
 uniform Sphere spheres[20];
-int spheres_number = 1;
+uniform int spheres_number;
 Plane planes[10];
 int planes_number = 5;
 Triangle triangles[10];
@@ -228,6 +228,8 @@ Collision intersect_triangle(Ray ray, Triangle triangle) {
 	return coll;
 }
 
+
+
 // finds nearest intersection
 Collision intersection(Ray ray) {
 	Collision coll;
@@ -359,12 +361,6 @@ void main() {
 				vec3(lamp_size, 1 - lamp_h,-lamp_size)),
 			white_light);
 
-	spheres_number = 20;
-//	spheres[0] = Sphere(vec3(-1.0, 1., 1.5) * 0.3, 0.7, red_light);
-//	spheres[0] = Sphere(vec3(0.0, -0.0, -.0), 0.5, blue_light);
-//	spheres[3] = Sphere(vec3(0.3, 0.3, 1.), 0.2, mirror_1);
-//	spheres[2] = Sphere(vec3(-.5, -1.0, 0.4), 0.4, mirror_2);
-//	spheres[1] = Sphere(vec3(0., .9, 0.0), 0.2, white_light);
 	planes_number = 6;
 	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), white_panel);
 	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), white_panel);
