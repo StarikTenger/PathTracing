@@ -28,7 +28,7 @@ struct Sphere {
 	Material mat;
 };
 
-const int image_size = 500;
+const int image_size = 200;
 const unsigned int steps = 1000;
 
 
@@ -137,8 +137,8 @@ void set_shader() {
 
 int main(int argc, char** argv) {
 	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.03, 0.0, 0.0 };
-	for (int i = 0; i < 20; i++) {
-		spheres.push_back({ vec3(sin(i * 0.5) * 0.3, -0.9 + i * 0.09, cos(i * 0.5) * 0.3), 0.17, red_light });
+	for (int i = 0; i < 1; i++) {
+		spheres.push_back({ vec3(sin(i * 0.5) * 0.3, -0.09 + i * 0.09, cos(i * 0.5) * 0.3), 0.517, red_light });
 	}
 	
 
