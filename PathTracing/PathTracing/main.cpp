@@ -9,6 +9,7 @@
 #include <iostream>
 #include "BMPWriter.h"
 #include "glm.hpp"
+#include "Timer.h"
 
 using namespace std;
 using namespace glm;
@@ -28,8 +29,8 @@ struct Sphere {
 	Material mat;
 };
 
-const int image_size = 200;
-const unsigned int steps = 1000;
+const int image_size = 1000;
+const unsigned int steps = 10000;
 
 
 GLuint ps, vs, prog, r_mod, timeq, window, uniform_size_x, uniform_size_y, 
@@ -38,6 +39,7 @@ float angle = 0;
 unsigned char buff[image_size * image_size * 3];
 unsigned long long bigbuff[image_size * image_size * 3];
 int samples = 0;
+Timer timer;
 
 void add_sample() {
 	samples++;
@@ -60,15 +62,19 @@ void render(void) {
 
 	glUniform1f(timeq, angle);
 
+	timer.start("step " + to_string(samples));
+
 	glBegin(GL_TRIANGLE_FAN);
 	glVertex3f(-1, -1, 0);
 	glVertex3f(-1, 1, 0);
 	glVertex3f(1, 1, 0);
 	glVertex3f(1, -1, 0);
 	glEnd();
+
 	glFlush();
 	angle += 0.001;
 	glReadPixels(0, 0, image_size, image_size, GL_BGR, GL_UNSIGNED_BYTE, buff);
+	timer.finish();
 	add_sample();
 	cout << samples << "\n";
 	if (samples >= steps) {	
@@ -136,9 +142,27 @@ void set_shader() {
 }
 
 int main(int argc, char** argv) {
-	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.03, 0.0, 0.0 };
-	for (int i = 0; i < 1; i++) {
-		spheres.push_back({ vec3(sin(i * 0.5) * 0.3, -0.09 + i * 0.09, cos(i * 0.5) * 0.3), 0.517, red_light });
+	/*Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.03, 0.9, 1.1};
+	for (int i = 0; i < 10; i++) {
+		red_light.col.x = cos(i * 3.3) * 0.5 + 0.5;
+		red_light.col.y = sin(i * 1.153 + 1) * 0.5 + 0.5;
+		red_light.col.z = sin(i * 2.234 + 0.454) * 0.5 + 0.5;
+		spheres.push_back({ vec3(sin(i * 1.5) * 0.79, -0.9 + i * 0.18, cos(i * 0.6) * 0.7), 0.2f + (float)sin(i * 1.) * 0.1f, red_light });
+	}*/
+
+	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.003, 0.5, 1.5 };
+	for (int i = 0; i < 85; i++) {
+		float h = -0.9 + i * 0.02;
+		float r = sqrt(1 - h * h);
+		spheres.push_back({ vec3(sin(i * 0.3) * r, -0.9 + i * 0.02, cos(i * 0.3) * r), 0.1, red_light });
+		spheres[i].mat.col = abs(spheres[i].pos);
+		/*if (i % 5 == 0) {
+			spheres[i].mat.glow = 1.0;
+			spheres[i].mat.refr = 0.0;
+			spheres[i].mat.ref = 0.0;
+			spheres[i].mat.diff = 1.0;
+		}*/
+		//spheres.push_back({ vec3(sin(i * 0.5) * 0.6, -0.9 + i * 0.01, cos(i * 0.5) * 0.6), 0.17, red_light });
 	}
 	
 

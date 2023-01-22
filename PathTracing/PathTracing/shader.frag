@@ -1,11 +1,9 @@
-#version 330 core
+#version 430 core
 varying float x, y, z;
 uniform float r_mod;
 const float EPS = 1e-5;
 const float PI = 3.14159265359;
 const int DEPTH = 10;
-const int BRANCH = 2;
-const int STEPS = 1;
 uniform float time;
 uniform float size_x;
 uniform float size_y;
@@ -49,7 +47,7 @@ float random( vec3  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 
 float rand(float l, float r) {
-	random_magic_parameter += 1.1231;
+	random_magic_parameter += 0.1231;
 	return l + random(vec4(x, y, time, random_magic_parameter)) * (r - l);
 }
 
@@ -96,7 +94,7 @@ struct Triangle {
 
 // -- ARRAYS -------------------------------------------------------------------
 
-uniform Sphere spheres[20];
+uniform Sphere spheres[100];
 uniform int spheres_number;
 Plane planes[10];
 int planes_number = 5;
@@ -230,6 +228,8 @@ Collision intersect_triangle(Ray ray, Triangle triangle) {
 	return coll;
 }
 
+
+
 // finds nearest intersection
 Collision intersection(Ray ray) {
 	Collision coll;
@@ -270,91 +270,52 @@ Collision intersection(Ray ray) {
 }
 
 // -- PATH TRACING -------------------------------------------------------------
-struct CollisionStored {
-	vec3 color_modifier;
-	vec3 dir;
-	Collision coll;
-	int depth;
-};
-
-struct CollisionStack {
-	CollisionStored data[100];
-	int size;
-} collisions;
-
-void collisions_push(CollisionStored cs) {
-	collisions.data[collisions.size] = cs;
-	collisions.size++;
-}
-
-void collisions_pop() {
-	collisions.size--;
-}
-
-CollisionStored collisions_back() {
-	return collisions.data[collisions.size - 1];
-}
-
-vec3 trace_path(Ray ray0) {
+vec3 trace_path(Ray ray) {
 	vec3 color = vec3(1,1,1) * 0.;
-
-	collisions.size = 0;
-	collisions_push(CollisionStored(vec3(1,1,1), ray0.dir, intersection(ray0), 0));
-
-	while(collisions.size > 0) {
-		CollisionStored cs = collisions_back();
-		collisions_pop();
-		Collision coll = cs.coll;
-		vec3 color_modifier = cs.color_modifier;
-		
-
-		if (coll.exists && cs.depth < DEPTH) {
-			color_modifier *= coll.mat.col;
+	vec3 color_modifier = vec3(1,1,1);
+	for (int i = 0; i < DEPTH; i++) {
+		Collision coll = intersection(ray);
+		if (coll.exists) {
+			
 		} else {
 			break;
 		}
-
-		for (int i = 0; i < BRANCH; i++) {
-			Ray ray;
-			ray.dir = cs.dir;
-			ray.origin = coll.pos + coll.norm * EPS;
-
-			if (rand(0, 1) >= coll.mat.ref) {
-				color += coll.mat.col * (coll.mat.glow) * color_modifier;
-				vec3 new_dir = normalize(vec3(gaussian(), gaussian().x));
-				if (dot(coll.norm, new_dir) < 0) {
-					new_dir *= -1;
-				}
-				ray.dir = new_dir;
-			} else 
-			if (rand(0, 1) < coll.mat.refr) {
-				//i--;
-				vec3 new_dir = ray.dir;
-				if (dot(coll.norm, ray.dir) < 0) {
-					ray.origin = coll.pos - coll.norm * EPS;
-					new_dir = refract(ray.dir, coll.norm, 1/coll.mat.refr_k);
-				}
-				else {
-					ray.origin = coll.pos + coll.norm * EPS;
-					new_dir = refract(ray.dir, -coll.norm, coll.mat.refr_k);
-				}
-				if (distance(vec3(0,0,0), new_dir) < 0.5) {
-					//ray.origin = coll.pos - coll.norm * EPS;
-					//new_dir = ray.dir;
-					//new_dir = reflect(ray.dir, coll.norm);
-					//new_dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
-					//new_dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
-					//new_dir = normalize(new_dir);
-				}
-				ray.dir = new_dir;
-			} else {
-				ray.dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
-				ray.dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
-				ray.dir = normalize(ray.dir);
+		vec3 n = normalize(coll.norm * dot(coll.norm, ray.dir));
+		ray.origin = coll.pos + coll.norm * EPS;
+		if (rand(0, 1) >= coll.mat.ref) {
+			color += coll.mat.col * (coll.mat.glow) * color_modifier;
+			vec3 new_dir = normalize(vec3(gaussian(), gaussian().x));
+			if (dot(coll.norm, new_dir) < 0) {
+				new_dir *= -1;
 			}
-		
-			collisions_push(CollisionStored(color_modifier, ray.dir, intersection(ray), cs.depth + 1));
+			ray.dir = new_dir;
+		} else 
+		if (rand(0, 1) < coll.mat.refr) {
+			//i--;
+			vec3 new_dir = ray.dir;
+			if (dot(coll.norm, ray.dir) < 0) {
+				ray.origin = coll.pos - coll.norm * EPS;
+				new_dir = refract(ray.dir, coll.norm, 1/coll.mat.refr_k);
+			}
+			else {
+				ray.origin = coll.pos + coll.norm * EPS;
+				new_dir = refract(ray.dir, -coll.norm, coll.mat.refr_k);
+			}
+			if (distance(vec3(0,0,0), new_dir) < 0.5) {
+				//ray.origin = coll.pos - coll.norm * EPS;
+				//new_dir = ray.dir;
+				//new_dir = reflect(ray.dir, coll.norm);
+				//new_dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
+				//new_dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
+				//new_dir = normalize(new_dir);
+			}
+			ray.dir = new_dir;
+		} else {
+			ray.dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
+			ray.dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
+			ray.dir = normalize(ray.dir);
 		}
+		color_modifier *= coll.mat.col;
 	}
 	
 	return color;
@@ -363,7 +324,7 @@ vec3 trace_path(Ray ray0) {
 // -- MAIN FUNCTION ------------------------------------------------------------
 
 void main() {
-	vec3 cam_pos = {-0.0, 0.0, -1.4};
+	vec3 cam_pos = {-0.0, 0.0, -2};
 	Cam cam = {cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), {0.0, 1.0, 0.0}, 1.};
 
 	Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
@@ -401,10 +362,10 @@ void main() {
 	planes[5] = Plane(vec3(0.0, 0.0, -2.01), vec3(0.0, 0.0, 1.0), black_panel);
 
 	vec3 ray_dir = calc_ray_dir(cam, vec2(x, y));
+	int steps = 10;
 	vec3 col = {0,0,0};
-	for (int i = 0; i < STEPS; i++) {
-		collisions.size = 0;
-		col += trace_path(Ray(cam.pos, ray_dir)) / STEPS / pow(2, BRANCH - 1);
+	for (int i = 0; i < steps; i++) {
+		col += trace_path(Ray(cam.pos, ray_dir)) / steps;
 	}
 	gl_FragColor = vec4(col, 1);
 }
