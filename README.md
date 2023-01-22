@@ -17,7 +17,7 @@ Implementation of [path tracing](https://en.wikipedia.org/wiki/Path_tracing). Al
 Multicolored glass spheres
 ![](showcase/1.png)
 
-Different coefficients of diffusion reflection
+Different coefficients of diffuse reflection
 ![](showcase/2.png)
 
 Colored light sources
