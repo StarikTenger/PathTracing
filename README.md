@@ -22,3 +22,6 @@ Different coefficients of diffusion reflection
 
 Colored light sources
 ![](showcase/3.png)
+
+Red and blue caustics from glass sphere
+![](showcase/4.png)
