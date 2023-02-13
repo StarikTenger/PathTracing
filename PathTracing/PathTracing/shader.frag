@@ -4,6 +4,7 @@ uniform float r_mod;
 const float EPS = 1e-5;
 const float PI = 3.14159265359;
 const int DEPTH = 10;
+const bool USE_BIDIRECTIONAL = true;
 uniform float time;
 uniform float size_x;
 uniform float size_y;
@@ -92,6 +93,8 @@ struct Triangle {
 	Material mat;
 };
 
+Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
+
 // -- ARRAYS -------------------------------------------------------------------
 
 uniform Sphere spheres[100];
@@ -131,6 +134,31 @@ struct Collision {
 	vec3 norm;
 	Material mat;
 };
+
+// -- PICKING RANDOM POINTS ----------------------------------------------------
+
+vec3 pick_random_point(Triangle p) {
+	vec2 coords = {rand(0, 1), rand(0, 1)};
+	if (coords.x + coords.y > 1) {
+		coords = vec2(1 - coords.y, 1 - coords.x);
+	}
+	return p.vertices[0] + 
+		(p.vertices[1] - p.vertices[0]) * coords.x  + 
+		(p.vertices[2] - p.vertices[0]) * coords.y;
+}
+
+struct RayInit {
+	Ray ray;
+	vec3 col;
+};
+
+// TODO: estimate surface areas
+RayInit random_light_ray() {
+	int i = int(rand(0, triangles_number));
+	vec3 p = pick_random_point(triangles[i]);
+	vec3 dir = normalize(vec3(gaussian(), gaussian().x));
+	return RayInit(Ray(p, dir), vec3(10, 10, 10));
+}
 
 // -- INTERSECTION METHODS -----------------------------------------------------
 
@@ -228,8 +256,6 @@ Collision intersect_triangle(Ray ray, Triangle triangle) {
 	return coll;
 }
 
-
-
 // finds nearest intersection
 Collision intersection(Ray ray) {
 	Collision coll;
@@ -269,12 +295,48 @@ Collision intersection(Ray ray) {
 	return coll;
 }
 
+// Check if two points can be conected
+bool check_visibility(vec3 p1, vec3 p2) {
+	Collision coll = intersection(Ray(p1 + normalize(p2 - p1) * EPS, normalize(p2 - p1)));
+	return distance(p1, p2) <= distance(p1, coll.pos) + EPS;
+}
+
+// Checks if the point projection is in current pixel
+bool project_to_pixel(vec3 p, Cam cam) {
+	vec3 f = cam.pos;
+	// TODO: implement non-kostyle intersection
+	vec3 proj = intersect_plane(Ray(p, normalize(f - p)), 
+		Plane(cam.pos + cam.dir * cam.focus, cam.dir, white_light)).pos;
+	vec3 right = -normalize(cross(cam.dir, cam.up));
+	vec2 proj2d = {dot(proj, right), dot(proj, cam.up)};
+		
+	int proj_x = int(proj2d.x);
+	int proj_y = int(proj2d.y);
+
+	return distance(vec2(x, y), proj2d) < 0.01;//int(x * size_x) == proj_x && int(y * size_y) == proj_y;
+}
+
 // -- PATH TRACING -------------------------------------------------------------
-vec3 trace_path(Ray ray) {
-	vec3 color = vec3(1,1,1) * 0.;
-	vec3 color_modifier = vec3(1,1,1);
-	for (int i = 0; i < DEPTH; i++) {
-		Collision coll = intersection(ray);
+Cam cam;
+
+// path tracing result
+struct TraceRes {
+	vec3 color;
+	vec3 color_modifier;
+	Collision coll;
+};
+
+TraceRes cam_path[10];
+int cam_path_size = 0;
+TraceRes light_path[10];
+int light_path_size = 0;
+
+TraceRes trace_path(Ray ray, vec3 color_modifier, int depth, bool path_type) {
+	vec3 color = vec3(0,0,0);
+	Collision coll;
+
+	for (int i = 0; i < depth; i++) {
+		coll = intersection(ray);
 		if (coll.exists) {
 			
 		} else {
@@ -316,16 +378,51 @@ vec3 trace_path(Ray ray) {
 			ray.dir = normalize(ray.dir);
 		}
 		color_modifier *= coll.mat.col;
+
+		if (!path_type) { // 0 stands for cam_path
+			cam_path[cam_path_size] = TraceRes(color, color_modifier, coll);
+			cam_path_size++;
+		} else { // 0 stands for light_path
+			light_path[light_path_size] = TraceRes(color, color_modifier, coll);
+			light_path_size++;
+		}
 	}
 	
-	return color;
+	return TraceRes(color, color_modifier, coll);
+}
+
+vec3 trace_bidirectional(Ray ray) {
+	cam_path_size = 0;
+	light_path_size = 0;
+	int l = 10;
+	int r = 3;
+	TraceRes tres1 = trace_path(ray, vec3(1,1,1), l, false);
+	RayInit rinit = random_light_ray();
+	TraceRes tres2 = trace_path(rinit.ray, rinit.col, r, true);
+	vec3 col_res = {0,0,0};
+
+	for (int i = 0; i < cam_path_size; i++) {
+		for (int j = 0; j < light_path_size; j++) {
+			col_res +=
+				light_path[j].color_modifier * cam_path[i].color_modifier
+				/ pow(5 * distance(tres1.coll.pos, tres2.coll.pos), 2)
+				* (1 - tres1.coll.mat.ref)
+				* (1 - tres2.coll.mat.ref)
+				* (1 - tres1.coll.mat.refr)
+				* (1 - tres2.coll.mat.refr);
+		}
+	}
+	col_res /= cam_path_size * light_path_size;
+	col_res += tres1.color;
+	return col_res;
 }
 
 // -- MAIN FUNCTION ------------------------------------------------------------
 
+
 void main() {
 	vec3 cam_pos = {-0.0, 0.0, -2};
-	Cam cam = {cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), {0.0, 1.0, 0.0}, 1.};
+	cam = Cam(cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), vec3(0.0, 1.0, 0.0), 1.);
 
 	Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
 	Material red_light = {{1.0, 0.7, 0.7}, 0.0, 1.0, 0.03, 0.0, 0.0};
@@ -335,10 +432,11 @@ void main() {
 	Material mirror_2 = {{0.5, 1.0, 0.6}, 0.0, 1.0, 0.0, 0.0, 0.0};
 	Material white_panel = {vec3(1,1,1) * 0.9, 0.0, 0.0, 0.0, 0.0, 0.0};
 	Material black_panel = {{0.0, 0.0, 0.0}, 0.0, 0.0, 0.0, 0.0, 0.0};
-	Material yellow_panel = {{0.7, 1.0, 0.4}, 0.0, 0.0, 0.0, 0.0, 0.0};
+	Material green_panel = {{0, 1.0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0};
+	Material red_panel = {{1.0, 0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 	triangles_number = 2;
-	float lamp_size = 0.2;
+	float lamp_size = 0.3;
 	float lamp_h = 0.01;
 	triangles[0] = Triangle(
 			vec3[3](
@@ -355,17 +453,24 @@ void main() {
 
 	planes_number = 6;
 	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), white_panel);
-	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), white_panel);
-	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), white_panel);
+	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), green_panel);
+	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), red_panel);
 	planes[3] = Plane(vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), white_panel);
-	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), yellow_panel);
+	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), white_panel);
 	planes[5] = Plane(vec3(0.0, 0.0, -2.01), vec3(0.0, 0.0, 1.0), black_panel);
 
 	vec3 ray_dir = calc_ray_dir(cam, vec2(x, y));
 	int steps = 10;
 	vec3 col = {0,0,0};
-	for (int i = 0; i < steps; i++) {
-		col += trace_path(Ray(cam.pos, ray_dir)) / steps;
+	if (USE_BIDIRECTIONAL) {
+		for (int i = 0; i < steps; i++) {
+			col += trace_bidirectional(Ray(cam.pos, ray_dir)) / steps;
+		}
+	} else {
+		for (int i = 0; i < steps; i++) {
+			col += trace_path(Ray(cam.pos, ray_dir), vec3(1,1,1), DEPTH, false).color / steps;
+		}
 	}
+	
 	gl_FragColor = vec4(col, 1);
 }

@@ -29,8 +29,8 @@ struct Sphere {
 	Material mat;
 };
 
-const int image_size = 1000;
-const unsigned int steps = 10000;
+const int image_size = 400;
+const unsigned int steps = 100;
 
 
 GLuint ps, vs, prog, r_mod, timeq, window, uniform_size_x, uniform_size_y, 
@@ -150,20 +150,40 @@ int main(int argc, char** argv) {
 		spheres.push_back({ vec3(sin(i * 1.5) * 0.79, -0.9 + i * 0.18, cos(i * 0.6) * 0.7), 0.2f + (float)sin(i * 1.) * 0.1f, red_light });
 	}*/
 
-	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.003, 0.5, 1.5 };
-	for (int i = 0; i < 85; i++) {
-		float h = -0.9 + i * 0.02;
-		float r = sqrt(1 - h * h);
-		spheres.push_back({ vec3(sin(i * 0.3) * r, -0.9 + i * 0.02, cos(i * 0.3) * r), 0.1, red_light });
-		spheres[i].mat.col = abs(spheres[i].pos);
-		/*if (i % 5 == 0) {
-			spheres[i].mat.glow = 1.0;
-			spheres[i].mat.refr = 0.0;
-			spheres[i].mat.ref = 0.0;
-			spheres[i].mat.diff = 1.0;
-		}*/
-		//spheres.push_back({ vec3(sin(i * 0.5) * 0.6, -0.9 + i * 0.01, cos(i * 0.5) * 0.6), 0.17, red_light });
-	}
+	//Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.003, 0.5, 1.5 };
+	Material white_light = { {1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0 };
+	Material red_light = { {1.0, 0., 0.}, 30.0, 0.0, 0.003, 0.5, 1.5 };
+	Material blue_light = { {0., 0., 1.0}, 30.0, 0.0, 0.003, 0.5, 1.5 };
+	Material green_light = { {0, 1, 0}, 3.0, 0.0, 0.003, 0.5, 1.5 };
+	Material glass = { {1.,1.,1.}, 0.0, 1.0, 0.0, 0.8, 1.5 };
+	//Material glass = { {0.,0.,1.}, 0.0, 0.0, 0.0, 0.0, 1. };
+	//for (int i = 0; i < 85; i++) {
+	//	float h = -0.9 + i * 0.02;
+	//	float r = sqrt(1 - h * h);
+	//	spheres.push_back({ vec3(sin(i * 0.3) * r, -0.9 + i * 0.02, cos(i * 0.3) * r), 0.1, red_light });
+	//	spheres[i].mat.col = abs(spheres[i].pos);
+	//	/*if (i % 5 == 0) {
+	//		spheres[i].mat.glow = 1.0;
+	//		spheres[i].mat.refr = 0.0;
+	//		spheres[i].mat.ref = 0.0;
+	//		spheres[i].mat.diff = 1.0;
+	//	}*/
+	//	//spheres.push_back({ vec3(sin(i * 0.5) * 0.6, -0.9 + i * 0.01, cos(i * 0.5) * 0.6), 0.17, red_light });
+	//}
+	//spheres.push_back({ vec3(0,0,0), 0.2, white_light});
+
+	//spheres.push_back({ vec3(0.8,0.8,0.7), 0.5, red_light });
+	//spheres.push_back({ vec3(-0.8,0.8,0.7), 0.5, blue_light });
+	spheres.push_back({ vec3(0.0,0.0,0.), 0.4, glass });
+
+	/*Material red_light = { {1.0, 0., 0.}, 3.0, 0.0, 0.003, 0.5, 1.5 };
+	Material blue_light = { {0., 0., 1.0}, 3.0, 0.0, 0.003, 0.5, 1.5 };
+	Material green_light = { {0, 1, 0}, 3.0, 0.0, 0.003, 0.5, 1.5 };
+	Material glass = { {1, 1, 1.0}, 0.0, 1.0, 0.03, 0.5, 1.5 };
+	spheres.push_back({ vec3(-0.5,1,0), 0.2, red_light });
+	spheres.push_back({ vec3(0.5,1,0), 0.2, blue_light });
+	spheres.push_back({ vec3(0,1,0), 0.2, green_light });
+	spheres.push_back({ vec3(0,0,0), 0.4, glass });*/
 	
 
 	glutInit(&argc, argv);
