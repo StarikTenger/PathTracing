@@ -52,10 +52,13 @@ void sum_samples() {
 	for (int i = 0; i < image_size * image_size * 3; i++) {
 		buff[i] = bigbuff[i] / samples;
 	}
-	generateBitmapImage(buff, image_size, image_size, (char*)"image.bmp");
+	generateBitmapImage(buff, image_size, image_size, (to_string(steps) + "_steps" + 
+		to_string(image_size) + "x" + to_string(image_size) + "px.bmp").c_str());
 }
 
 vector<Sphere> spheres;
+
+int time_elapsed = 0;
 
 void render(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -74,11 +77,12 @@ void render(void) {
 	glFlush();
 	angle += 0.001;
 	glReadPixels(0, 0, image_size, image_size, GL_BGR, GL_UNSIGNED_BYTE, buff);
-	timer.finish();
+	time_elapsed += timer.finish();
 	add_sample();
 	cout << samples << "\n";
-	if (samples >= steps) {	
+	if (samples >= steps) {
 		sum_samples();
+		cout << "Time elapsed: " << time_elapsed << "ms\n";
 		glutDestroyWindow(window);
 	}
 }
@@ -142,20 +146,21 @@ void set_shader() {
 }
 
 int main(int argc, char** argv) {
-	/*Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.03, 0.9, 1.1};
+	Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.00, 0.5, 1.5 };
 	for (int i = 0; i < 10; i++) {
 		red_light.col.x = cos(i * 3.3) * 0.5 + 0.5;
 		red_light.col.y = sin(i * 1.153 + 1) * 0.5 + 0.5;
 		red_light.col.z = sin(i * 2.234 + 0.454) * 0.5 + 0.5;
 		spheres.push_back({ vec3(sin(i * 1.5) * 0.79, -0.9 + i * 0.18, cos(i * 0.6) * 0.7), 0.2f + (float)sin(i * 1.) * 0.1f, red_light });
-	}*/
+	}
+	//spheres.push_back({ {0,-0.4, 0}, 0.5, { {1.0, 1.0, 1.0}, 0.0, 1.0, 0, 1, (float)pow(1.05, 6)}});
 
 	//Material red_light = { {1.0, 1.0, 1.0}, 0.0, 1.0, 0.003, 0.5, 1.5 };
 	Material white_light = { {1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0 };
-	Material red_light = { {1.0, 0., 0.}, 30.0, 0.0, 0.003, 0.5, 1.5 };
+	//Material red_light = { {1.0, 0., 0.}, 30.0, 0.0, 0.003, 0.5, 1.5 };
 	Material blue_light = { {0., 0., 1.0}, 30.0, 0.0, 0.003, 0.5, 1.5 };
 	Material green_light = { {0, 1, 0}, 3.0, 0.0, 0.003, 0.5, 1.5 };
-	Material glass = { {1.,1.,1.}, 0.0, 1.0, 0.0, 0.8, 1.5 };
+	Material glass = { {1.,1.,1.}, 0.0, 1.0, 0.0, 0., 1.5 };
 	//Material glass = { {0.,0.,1.}, 0.0, 0.0, 0.0, 0.0, 1. };
 	//for (int i = 0; i < 85; i++) {
 	//	float h = -0.9 + i * 0.02;
@@ -174,7 +179,7 @@ int main(int argc, char** argv) {
 
 	//spheres.push_back({ vec3(0.8,0.8,0.7), 0.5, red_light });
 	//spheres.push_back({ vec3(-0.8,0.8,0.7), 0.5, blue_light });
-	spheres.push_back({ vec3(0.0,0.0,0.), 0.4, glass });
+	//spheres.push_back({ vec3(0.0,0.0,0.), 0.4, glass });
 
 	/*Material red_light = { {1.0, 0., 0.}, 3.0, 0.0, 0.003, 0.5, 1.5 };
 	Material blue_light = { {0., 0., 1.0}, 3.0, 0.0, 0.003, 0.5, 1.5 };
@@ -189,7 +194,7 @@ int main(int argc, char** argv) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
 	glutInitWindowSize(image_size, image_size);
-	window = glutCreateWindow("Zhopa");
+	window = glutCreateWindow("Rendering window");
 	glutIdleFunc(render);
 
 	glewInit();

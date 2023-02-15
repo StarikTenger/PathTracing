@@ -86,12 +86,18 @@ struct Plane {
 	vec3 origin;
 	vec3 norm;
 	Material mat;
+	bool chess;
 };
 
 struct Triangle {
 	vec3 vertices[3];
 	Material mat;
 };
+
+bool chess_coloring(vec2 pos, float k){
+	return (sign(sin(pos.x/k*PI/2)) == sign(sin(pos.y/k*PI/2)));
+}
+
 
 Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
 
@@ -217,6 +223,11 @@ Collision intersect_plane(Ray ray, Plane plane) {
 	}
 
 	coll.mat = plane.mat;
+	
+	if (plane.chess && chess_coloring(coll.pos.xy, 0.1)) {
+		coll.mat.col = vec3(1,1,1) - coll.mat.col;
+	}
+
 	return coll;
 }
 
@@ -229,10 +240,6 @@ Collision intersect_triangle(Ray ray, Triangle triangle) {
     int positives = 0;
     int negatives = 0;
 	for (int i = 0; i < 3; i++) {
-//		float area = 0.5 * determinant(mat3(
-//			triangle.vertices[(i + 1) % 3] - ray.origin,
-//			triangle.vertices[(i + 2) % 3] - ray.origin,
-//			ray.dir));
 		float area = 0.5 * dot(cross(
 			triangle.vertices[(i + 1) % 3] - ray.origin,
 			triangle.vertices[(i + 2) % 3] - ray.origin),
@@ -250,7 +257,7 @@ Collision intersect_triangle(Ray ray, Triangle triangle) {
 			cross(
 				triangle.vertices[1] - triangle.vertices[0], 
 				triangle.vertices[2] - triangle.vertices[0]),
-			triangle.mat));
+			triangle.mat, false));
 	}
 
 	return coll;
@@ -306,7 +313,7 @@ bool project_to_pixel(vec3 p, Cam cam) {
 	vec3 f = cam.pos;
 	// TODO: implement non-kostyle intersection
 	vec3 proj = intersect_plane(Ray(p, normalize(f - p)), 
-		Plane(cam.pos + cam.dir * cam.focus, cam.dir, white_light)).pos;
+		Plane(cam.pos + cam.dir * cam.focus, cam.dir, white_light, false)).pos;
 	vec3 right = -normalize(cross(cam.dir, cam.up));
 	vec2 proj2d = {dot(proj, right), dot(proj, cam.up)};
 		
@@ -326,9 +333,9 @@ struct TraceRes {
 	Collision coll;
 };
 
-TraceRes cam_path[10];
+TraceRes cam_path[16];
 int cam_path_size = 0;
-TraceRes light_path[10];
+TraceRes light_path[16];
 int light_path_size = 0;
 
 TraceRes trace_path(Ray ray, vec3 color_modifier, int depth, bool path_type) {
@@ -344,7 +351,7 @@ TraceRes trace_path(Ray ray, vec3 color_modifier, int depth, bool path_type) {
 		}
 		vec3 n = normalize(coll.norm * dot(coll.norm, ray.dir));
 		ray.origin = coll.pos + coll.norm * EPS;
-		if (rand(0, 1) >= coll.mat.ref) {
+		if (rand(0, 1) >= coll.mat.ref) { // fully diffuse
 			color += coll.mat.col * (coll.mat.glow) * color_modifier;
 			vec3 new_dir = normalize(vec3(gaussian(), gaussian().x));
 			if (dot(coll.norm, new_dir) < 0) {
@@ -352,7 +359,7 @@ TraceRes trace_path(Ray ray, vec3 color_modifier, int depth, bool path_type) {
 			}
 			ray.dir = new_dir;
 		} else 
-		if (rand(0, 1) < coll.mat.refr) {
+		if (rand(0, 1) < coll.mat.refr || dot(coll.norm, ray.dir) > 0) { // refraction
 			//i--;
 			vec3 new_dir = ray.dir;
 			if (dot(coll.norm, ray.dir) < 0) {
@@ -364,18 +371,21 @@ TraceRes trace_path(Ray ray, vec3 color_modifier, int depth, bool path_type) {
 				new_dir = refract(ray.dir, -coll.norm, coll.mat.refr_k);
 			}
 			if (distance(vec3(0,0,0), new_dir) < 0.5) {
-				//ray.origin = coll.pos - coll.norm * EPS;
-				//new_dir = ray.dir;
-				//new_dir = reflect(ray.dir, coll.norm);
-				//new_dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
-				//new_dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
-				//new_dir = normalize(new_dir);
+//				ray.origin = coll.pos - coll.norm * EPS;
+//				new_dir = ray.dir;
+//				new_dir = reflect(ray.dir, coll.norm);
+//				new_dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
+//				new_dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
+//				new_dir = normalize(new_dir);
 			}
 			ray.dir = new_dir;
-		} else {
+		} else { // reflection
 			ray.dir -= 2 * coll.norm * dot(coll.norm, ray.dir);
-			ray.dir += vec3(gaussian(), gaussian().x) * coll.mat.diff;
-			ray.dir = normalize(ray.dir);
+			vec3 diff_dir = normalize(vec3(gaussian(), gaussian().x));
+			if (dot(coll.norm, diff_dir) < 0) {
+				diff_dir *= -1;
+			}
+			ray.dir = normalize(ray.dir * (1 - coll.mat.diff) + diff_dir * coll.mat.diff);
 		}
 		color_modifier *= coll.mat.col;
 
@@ -394,25 +404,28 @@ TraceRes trace_path(Ray ray, vec3 color_modifier, int depth, bool path_type) {
 vec3 trace_bidirectional(Ray ray) {
 	cam_path_size = 0;
 	light_path_size = 0;
-	int l = 10;
-	int r = 3;
+	int l = 5;
+	int r = 5;
 	TraceRes tres1 = trace_path(ray, vec3(1,1,1), l, false);
 	RayInit rinit = random_light_ray();
 	TraceRes tres2 = trace_path(rinit.ray, rinit.col, r, true);
 	vec3 col_res = {0,0,0};
 
+	light_path[0].coll.pos = rinit.ray.origin;
+	light_path[0].color_modifier = rinit.col;
+
 	for (int i = 0; i < cam_path_size; i++) {
 		for (int j = 0; j < light_path_size; j++) {
-			col_res +=
+			col_res += 
 				light_path[j].color_modifier * cam_path[i].color_modifier
-				/ pow(5 * distance(tres1.coll.pos, tres2.coll.pos), 2)
-				* (1 - tres1.coll.mat.ref)
-				* (1 - tres2.coll.mat.ref)
-				* (1 - tres1.coll.mat.refr)
-				* (1 - tres2.coll.mat.refr);
+				/ dot(cam_path[i].coll.pos - light_path[j].coll.pos, cam_path[i].coll.pos - light_path[j].coll.pos) / 25
+				* (1 - cam_path[i].coll.mat.ref)
+				* (1 - light_path[j].coll.mat.ref)
+				* (1 - cam_path[i].coll.mat.refr)
+				* (1 - light_path[j].coll.mat.refr) * (i + j + 1);
 		}
 	}
-	col_res /= cam_path_size * light_path_size;
+	col_res /= cam_path_size * light_path_size; 
 	col_res += tres1.color;
 	return col_res;
 }
@@ -422,7 +435,7 @@ vec3 trace_bidirectional(Ray ray) {
 
 void main() {
 	vec3 cam_pos = {-0.0, 0.0, -2};
-	cam = Cam(cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), vec3(0.0, 1.0, 0.0), 1.);
+	cam = Cam(cam_pos, (vec3(0.0, 0.0, 0.0) - cam_pos), vec3(0.0, 1.0, 0.0), 1.3);
 
 	Material white_light = {{1.0, 1.0, 1.0}, 10.0, 0.0, 0.0, 0.0, 0.0};
 	Material red_light = {{1.0, 0.7, 0.7}, 0.0, 1.0, 0.03, 0.0, 0.0};
@@ -434,6 +447,7 @@ void main() {
 	Material black_panel = {{0.0, 0.0, 0.0}, 0.0, 0.0, 0.0, 0.0, 0.0};
 	Material green_panel = {{0, 1.0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0};
 	Material red_panel = {{1.0, 0, 0}, 0.0, 0.0, 0.0, 0.0, 0.0};
+	Material blue_panel = {{0, 0, 1}, 0.0, 0.0, 0.0, 0.0, 0.0};
 
 	triangles_number = 2;
 	float lamp_size = 0.3;
@@ -452,12 +466,12 @@ void main() {
 			white_light);
 
 	planes_number = 6;
-	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), white_panel);
-	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), green_panel);
-	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), red_panel);
-	planes[3] = Plane(vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), white_panel);
-	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), white_panel);
-	planes[5] = Plane(vec3(0.0, 0.0, -2.01), vec3(0.0, 0.0, 1.0), black_panel);
+	planes[0] = Plane(vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0), white_panel, false);
+	planes[1] = Plane(vec3(-1.0, 0.0, 0.0), vec3(1.0, 0.0, 0.0), green_panel, false);
+	planes[2] = Plane(vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), red_panel, false);
+	planes[3] = Plane(vec3(0.0, 1.0, 0.0), vec3(0.0, -1.0, 0.0), white_panel, false);
+	planes[4] = Plane(vec3(0.0, -1.0, 0.0), vec3(0.0, 1.0, 0.0), white_panel, false);
+	planes[5] = Plane(vec3(0.0, 0.0, -2.01), vec3(0.0, 0.0, 1.0), black_panel, false);
 
 	vec3 ray_dir = calc_ray_dir(cam, vec2(x, y));
 	int steps = 10;
